@@ -1,0 +1,20 @@
+*.session
+*.session-journal
+# Ignore local config and secrets
+src/config.py
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# Environment files
+.env
+.venv/
+venv/
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+# System files
+.DS_Store
+Thumbs.db
+# VSCode settings
+.vscode/
