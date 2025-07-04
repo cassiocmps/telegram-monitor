@@ -20,6 +20,7 @@ You should keep your real `config.py` out of version control. Use `src/config.ex
 - `src/utils.py`: Utility functions (send message, markdown escape)
 - `src/bot.py`: Main bot logic and event loop
 - `src/handlers/message_handler.py`: Message processing logic
+- `src/handlers/keyword_handler.py`: Interactive keyword manager (console)
 - `requirements.txt`: Python dependencies
 
 ## Usage
@@ -37,6 +38,17 @@ You should keep your real `config.py` out of version control. Use `src/config.ex
    ```bash
    python -m src.bot
    ```
+
+## Keyword Manager
+
+While the bot is running, you can manage keywords interactively in the console:
+
+- Select `1` to add a new keyword group (comma separated).
+- Select `2` to delete a keyword group by its index.
+- Select `3` to list all current keyword groups.
+- Select `4` to exit the keyword manager and terminate the bot.
+
+All changes are saved to `src/config.py` automatically.
 
 ## Notes
 
