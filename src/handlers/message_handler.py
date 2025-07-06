@@ -4,7 +4,11 @@ from ..utils import send_telegram_message
 
 def extract_price(message: str) -> str:
     value_matches = re.findall(r'\$\s?(\d+[.,]?\d*)', message)
-    return value_matches[-1] if value_matches else "N/A"
+    if not value_matches:
+        return "N/A"
+    prices = [float(v.replace('.', '').replace(',', '.')) for v in value_matches]
+    min_price = min(prices)
+    return str(min_price)
 
 def extract_links(message: str) -> str:
     links = re.findall(r'(https?://[^\s]+)', message)
