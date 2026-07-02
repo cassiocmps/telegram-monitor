@@ -39,5 +39,5 @@ async def handle_message(event, chat_names):
             msg_link = f"https://t.me/c/{str(chat_id)[4:]}/{event.message.id}" if str(chat_id).startswith("-100") else "Link unavailable"
             text = build_message(keyword_group, values, product_links, chat_name, msg_link)
 
-            send_telegram_message(text)
+            send_telegram_message(text, keyword_group, chat_name)
             return
