@@ -1,7 +1,7 @@
 from telethon import TelegramClient, events
 import asyncio
 import threading
-from src.config import api_id, api_hash, phone_number, keywords
+from src.config import api_id, api_hash, phone_number, keywords, IGNORED_CHATS
 from src.utils import send_telegram_message
 from src.handlers.message_handler import handle_message
 from src.handlers.keyword_handler import keyword_console_manager
@@ -16,7 +16,8 @@ def cache_chat_names(client, chat_names):
             chat_id = dialog.id
             chat_name = dialog.title or dialog.name or "Private Chat"
             chat_names[chat_id] = chat_name
-            print(f"Chat ID: {chat_id}, Chat Name: {chat_name}.")
+            if chat_id not in IGNORED_CHATS:
+                print(f"Chat ID: {chat_id}, Chat Name: {chat_name}.")
     return _cache
 
 @client.on(events.NewMessage)
