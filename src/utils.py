@@ -11,4 +11,7 @@ def send_telegram_message(message):
         'chat_id': CHAT_ID,
         'text': message
     }
-    requests.post(url, data=payload)
+    try:
+        requests.post(url, data=payload, timeout=10)
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Telegram send fail: {type(e).__name__}: {e}")
