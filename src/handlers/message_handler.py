@@ -1,21 +1,19 @@
 import re
-from ..config import keywords, IGNORED_CHATS, EXCEPTION_SUBSTRINGS
+from typing import List, Tuple
+from ..config import IGNORED_CHATS, EXCEPTION_SUBSTRINGS
 from ..utils import send_telegram_message
 from ..services.price_parser import extract_prices_with_values
+from ..services.text_matcher import matches_keyword_group, contains_any_exception
+from ..services.dedup_service import default_deduplicator
+from ..services.keyword_service import load_keywords
 
 
-def extract_prices(message: str) -> list:
-    """Extracts raw price strings using the robust price parser."""
-    pairs = extract_prices_with_values(message)
-    return [p[0] for p in pairs]
-
-
-def extract_links(message: str) -> str:
+def extract_links(message: str) -> List[str]:
     links = re.findall(r'(https?://[^\s]+)', message)
-    return "\n".join(links) if links else "No link found"
+    return links if links else []
 
 
-def build_message(keyword_group, value_pairs, product_links, chat_name, msg_link) -> str:
+def build_message(keyword_group: List[str], value_pairs: List[Tuple[str, float]], product_links: List[str], chat_name: str, msg_link: str) -> str:
     keyword_label = " ".join(keyword_group).upper()
     if value_pairs:
         prices_str = ', '.join([f'R$ {raw}' for raw, _ in value_pairs])
@@ -24,7 +22,9 @@ def build_message(keyword_group, value_pairs, product_links, chat_name, msg_link
             prices_str += f" (Lowest: R$ {cheapest[0]})"
     else:
         prices_str = 'N/A'
-    return f"{keyword_label} {prices_str}\n{product_links}\n\n{chat_name}\n{msg_link}"
+    
+    links_str = "\n".join(product_links) if product_links else "No link found"
+    return f"{keyword_label} {prices_str}\n{links_str}\n\n{chat_name}\n{msg_link}"
 
 
 async def handle_message(event, chat_names):
@@ -34,23 +34,37 @@ async def handle_message(event, chat_names):
     if event.chat_id in IGNORED_CHATS:
         return
 
-    message = event.message.message.lower()
+    raw_message = event.message.message
 
-    if any(substr in message for substr in EXCEPTION_SUBSTRINGS):
+    # Check for exceptions using smart word-boundary matching
+    if contains_any_exception(raw_message, EXCEPTION_SUBSTRINGS):
         return
 
     chat_id = event.chat_id
     chat_name = chat_names.get(chat_id, "Unknown Chat")
-    # If chat_name is 'Unknown Chat', this is likely a reply message or from an unknown chat and should not be considered
     if chat_name == "Unknown Chat":
         return
 
-    normalized_message = message.replace('-', ' ')
-    for keyword_group in keywords:
-        if all(word.lower() in normalized_message for word in keyword_group):
-            value_pairs = extract_prices_with_values(event.message.message)
-            product_links = extract_links(event.message.message)
-            
+    # Dynamically fetch current keywords
+    current_keywords = load_keywords()
+
+    for keyword_group in current_keywords:
+        if matches_keyword_group(raw_message, keyword_group):
+            value_pairs = extract_prices_with_values(raw_message)
+            product_links = extract_links(raw_message)
+            numeric_prices = [p[1] for p in value_pairs]
+
+            # Check deduplication cooldown window
+            deal_key = default_deduplicator.generate_deal_key(
+                keyword_group=keyword_group,
+                links=product_links,
+                prices=numeric_prices,
+                raw_text=raw_message
+            )
+            if default_deduplicator.is_duplicate(deal_key):
+                print(f"[DEDUP] Suppressing duplicate alert for '{' '.join(keyword_group)}' in {chat_name}")
+                return
+
             msg_link = f"https://t.me/c/{str(chat_id)[4:]}/{event.message.id}" if str(chat_id).startswith("-100") else "Link unavailable"
             text = build_message(keyword_group, value_pairs, product_links, chat_name, msg_link)
 

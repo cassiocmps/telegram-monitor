@@ -4,7 +4,12 @@ import asyncio
 from typing import Optional
 from telethon import TelegramClient
 
-from src.config import keywords
+from src.services.keyword_service import (
+    load_keywords,
+    save_keywords,
+    add_keyword_group,
+    delete_keyword_group
+)
 from src.services.stats_service import (
     fetch_price_history,
     calculate_statistics,
@@ -13,27 +18,6 @@ from src.services.stats_service import (
 )
 from src.services.chart_service import generate_pricing_chart
 from src.utils import send_telegram_photo, send_telegram_message
-
-CONFIG_PATH = 'src/config.py'
-
-
-def save_keywords_to_config(new_keywords):
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        in_keywords = False
-        for line in lines:
-            if line.strip().startswith('keywords = ['):
-                in_keywords = True
-                f.write('keywords = [\n')
-                for group in new_keywords:
-                    f.write(f"    {group},\n")
-            elif in_keywords:
-                if line.strip().startswith(']'):
-                    in_keywords = False
-                    f.write(']\n')
-            else:
-                f.write(line)
 
 
 def run_stats_query_sync(
@@ -54,17 +38,18 @@ def handle_console_stats(client: Optional[TelegramClient], loop: Optional[asynci
         print("[ERROR] Telegram client is not running yet. Please wait a moment.")
         return
 
+    current_keywords = load_keywords()
     print("\n--- Price Statistics & Chart Report ---")
     print("Monitored keywords:")
-    for idx, group in enumerate(keywords):
+    for idx, group in enumerate(current_keywords):
         print(f"  [{idx}] {' '.join(group)}")
     
     choice = input("Enter keyword (or number from list above): ").strip()
     if not choice:
         return
 
-    if choice.isdigit() and 0 <= int(choice) < len(keywords):
-        selected_keyword = " ".join(keywords[int(choice)])
+    if choice.isdigit() and 0 <= int(choice) < len(current_keywords):
+        selected_keyword = " ".join(current_keywords[int(choice)])
     else:
         selected_keyword = choice
 
@@ -117,8 +102,8 @@ def handle_console_stats(client: Optional[TelegramClient], loop: Optional[asynci
 
 
 def keyword_console_manager(client: Optional[TelegramClient] = None, loop: Optional[asyncio.AbstractEventLoop] = None):
-    global keywords
     while True:
+        current_keywords = load_keywords()
         print("\n" + "-" * 35)
         print("Telegram Monitor Menu:")
         print("1. Add keyword group")
@@ -132,21 +117,21 @@ def keyword_console_manager(client: Optional[TelegramClient] = None, loop: Optio
             group = input('Enter keyword group (comma separated): ').strip()
             group_list = [w.strip() for w in group.split(',') if w.strip()]
             if group_list:
-                keywords.append(group_list)
-                save_keywords_to_config(keywords)
-                print(f"Added: {group_list}")
+                add_keyword_group(group_list)
+                print(f"Added: {group_list} (saved to keywords.json)")
         elif cmd == '2':
-            for idx, group in enumerate(keywords):
+            for idx, group in enumerate(current_keywords):
                 print(f"{idx}: {group}")
             idx = input('Enter index to delete: ').strip()
-            if idx.isdigit() and 0 <= int(idx) < len(keywords):
-                removed = keywords.pop(int(idx))
-                save_keywords_to_config(keywords)
-                print(f"Removed: {removed}")
+            if idx.isdigit() and 0 <= int(idx) < len(current_keywords):
+                removed = current_keywords[int(idx)]
+                delete_keyword_group(int(idx))
+                print(f"Removed: {removed} (saved to keywords.json)")
             else:
                 print("Invalid index.")
         elif cmd == '3':
-            for idx, group in enumerate(keywords):
+            print("\nCurrent Monitored Keywords:")
+            for idx, group in enumerate(current_keywords):
                 print(f"{idx}: {group}")
         elif cmd == '4':
             handle_console_stats(client, loop)

@@ -3,10 +3,11 @@ import threading
 import shlex
 from telethon import TelegramClient, events
 
-from src.config import api_id, api_hash, phone_number, keywords, IGNORED_CHATS, CHAT_ID
+from src.config import api_id, api_hash, phone_number, IGNORED_CHATS, CHAT_ID
 from src.utils import send_telegram_message, send_telegram_photo
 from src.handlers.message_handler import handle_message
 from src.handlers.keyword_handler import keyword_console_manager
+from src.services.keyword_service import load_keywords
 from src.services.stats_service import (
     fetch_price_history,
     calculate_statistics,
@@ -120,7 +121,8 @@ async def main():
             # Log and cache all chat names
             await cache_chat_names(client, chat_names)()
 
-            keywords_list = ", ".join(" ".join(group).upper() for group in keywords)
+            current_keywords = load_keywords()
+            keywords_list = ", ".join(" ".join(group).upper() for group in current_keywords)
             print(f"Monitoring for keywords: {keywords_list}.")
 
             # Start the keyword console manager in a separate thread with event loop access

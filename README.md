@@ -15,12 +15,18 @@ You should keep your real `config.py` out of version control. Use `src/config.ex
 
 ## Structure
 
-- `src/config.py`: Your local configuration (not tracked by git)
+- `keywords.json`: Monitored keywords (managed dynamically via console or directly in JSON)
+- `src/config.py`: Your local configuration and credentials (not tracked by git)
 - `src/config.example.py`: Example config template (tracked by git)
-- `src/utils.py`: Utility functions (send message, markdown escape)
-- `src/bot.py`: Main bot logic and event loop
-- `src/handlers/message_handler.py`: Message processing logic
-- `src/handlers/keyword_handler.py`: Interactive keyword manager (console)
+- `src/utils.py`: Utility functions (send message, send photo, markdown escape)
+- `src/bot.py`: Main bot logic, command handler, and event loop
+- `src/handlers/message_handler.py`: Message processing, smart matching, and deduplication
+- `src/handlers/keyword_handler.py`: Interactive keyword manager and stats runner (console)
+- `src/services/text_matcher.py`: Smart token normalization, thousand-dot removal, and word boundary matching
+- `src/services/price_parser.py`: Robust currency parsing, unit-price filtering, and installment masking
+- `src/services/stats_service.py`: Telegram history querying, statistical aggregations, and Markdown reports
+- `src/services/chart_service.py`: Matplotlib visual charts (timeline, benchmarks, and distribution)
+- `src/services/dedup_service.py`: Sliding-window alert deduplication to prevent deal spam
 - `requirements.txt`: Python dependencies
 
 ## Usage
@@ -49,7 +55,7 @@ While the bot is running, you can manage keywords interactively in the console:
 - Select `4` to query price statistics (mean, median, min, max) and generate graphic reports.
 - Select `5` to exit the keyword manager and terminate the bot.
 
-All changes are saved to `src/config.py` automatically.
+All changes are saved to `keywords.json` automatically.
 
 ## Price Statistics & Reports
 

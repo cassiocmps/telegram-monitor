@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from telethon import TelegramClient
 
 from .price_parser import extract_prices_with_values
+from .text_matcher import matches_keyword_group, contains_any_exception, normalize_text
 from ..config import IGNORED_CHATS, EXCEPTION_SUBSTRINGS, CHAT_ID
 
 
@@ -15,7 +16,6 @@ def parse_time_scope(scope_str: Optional[str]) -> Tuple[Optional[datetime], str]
     into a UTC cutoff datetime and a human-readable label.
     """
     if not scope_str:
-        # Default to last 30 days
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         return cutoff, "Last Month"
 
@@ -32,16 +32,35 @@ def parse_time_scope(scope_str: Optional[str]) -> Tuple[Optional[datetime], str]
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         return cutoff, "Last Month"
 
-    # Match custom days, e.g. "14d" or "60 days"
     days_match = re.match(r"^(\d+)\s*(?:d|days|dias)?$", scope_lower)
     if days_match:
         days = int(days_match.group(1))
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         return cutoff, f"Last {days} Days"
 
-    # Default fallback
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     return cutoff, "Last Month"
+
+
+def choose_search_term(keyword_terms: List[str]) -> str:
+    """
+    Chooses the best server-side search token for Telegram's search API.
+    Prefers terms with letters or longer distinctive identifiers.
+    """
+    # Look for terms that have letters and length >= 4
+    alpha_terms = [t for t in keyword_terms if re.search(r'[a-zA-Z]', t) and len(t) >= 4]
+    if alpha_terms:
+        # Avoid generic short stop words like 'para', 'com', 'sem'
+        stop_words = {"para", "com", "sem", "mais", "tudo", "split"}
+        filtered = [t for t in alpha_terms if t.lower() not in stop_words]
+        if filtered:
+            return filtered[0]
+        return alpha_terms[0]
+
+    # Otherwise choose the longest term
+    if keyword_terms:
+        return max(keyword_terms, key=len)
+    return ""
 
 
 async def fetch_price_history(
@@ -53,7 +72,7 @@ async def fetch_price_history(
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
     Directly queries Telegram dialogs and messages for the given keyword
-    within the designated time scope.
+    within the designated time scope using smart normalization.
     
     Returns (records_list, scope_label).
     """
@@ -61,8 +80,12 @@ async def fetch_price_history(
     records: List[Dict[str, Any]] = []
     seen_message_keys = set()
 
-    # Split keyword terms for matching verification
-    keyword_terms = [t.lower() for t in keyword.split() if t.strip()]
+    # Split keyword into terms for group matching
+    keyword_terms = [w.strip() for w in keyword.split() if w.strip()]
+    if not keyword_terms:
+        return [], scope_label
+
+    server_search_term = choose_search_term(keyword_terms)
 
     target_dialogs = []
 
@@ -87,29 +110,27 @@ async def fetch_price_history(
         dialog_title = getattr(dialog, "title", None) or getattr(dialog, "name", None) or "Telegram Chat"
 
         try:
-            # Query Telegram using server-side search
-            async for msg in client.iter_messages(dialog, search=keyword, limit=max_messages_per_chat):
+            async for msg in client.iter_messages(dialog, search=server_search_term, limit=max_messages_per_chat):
                 if not msg or not msg.message:
                     continue
 
-                # Messages arrive newest first; stop if older than cutoff
+                # Stop if older than cutoff
                 if cutoff_dt and msg.date:
                     msg_date_utc = msg.date if msg.date.tzinfo else msg.date.replace(tzinfo=timezone.utc)
                     if msg_date_utc < cutoff_dt:
                         break
 
                 raw_text = msg.message
-                lower_text = raw_text.lower().replace("-", " ")
 
-                # Verify all keyword terms appear in the message
-                if not all(term in lower_text for term in keyword_terms):
+                # Smart exception filter
+                if contains_any_exception(raw_text, EXCEPTION_SUBSTRINGS):
                     continue
 
-                # Filter out exceptions
-                if any(substr.lower() in lower_text for substr in EXCEPTION_SUBSTRINGS):
+                # Smart keyword group match (handles 12000 <-> 12.000, 9070 xt <-> 9070xt, XG vs XXG)
+                if not matches_keyword_group(raw_text, keyword_terms):
                     continue
 
-                # Extract prices
+                # Extract prices (excluding unit prices like R$ 6,60 cada pacotinho)
                 extracted = extract_prices_with_values(raw_text)
                 if not extracted:
                     continue
@@ -139,7 +160,6 @@ async def fetch_price_history(
                     })
 
         except Exception as e:
-            # Continue checking other chats even if one fails or encounters permission limits
             print(f"[STATS] Error querying chat {dialog_title}: {e}")
             continue
 
@@ -169,7 +189,6 @@ def calculate_statistics(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         q25 = min_price
         q75 = max_price
 
-    # Find cheapest deal and latest deal
     cheapest_record = min(records, key=lambda r: r["price"])
     latest_record = max(records, key=lambda r: r["timestamp"])
 
@@ -206,12 +225,10 @@ def format_stats_report(stats: Dict[str, Any], keyword: str, scope_label: str) -
     cheapest = stats["cheapest_record"]
     latest = stats["latest_record"]
 
-    # Calculate difference between latest price and median
     latest_price = latest["price"]
     diff_pct = ((latest_price - median_val) / median_val) * 100
     diff_str = f"{'+' if diff_pct > 0 else ''}{diff_pct:.1f}% vs median"
 
-    # Calculate discount percentage of the lowest price compared to median
     min_discount_pct = ((median_val - min_val) / median_val) * 100 if median_val > 0 else 0.0
     min_discount_str = f"({min_discount_pct:.1f}% below median)" if min_discount_pct > 0 else "(at median)"
     min_date_str = cheapest["timestamp"].strftime("%d/%m/%Y %H:%M")
