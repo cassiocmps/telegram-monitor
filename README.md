@@ -39,16 +39,33 @@ You should keep your real `config.py` out of version control. Use `src/config.ex
    python -m src.bot
    ```
 
-## Keyword Manager
+## Keyword Manager & Price Statistics
 
 While the bot is running, you can manage keywords interactively in the console:
 
 - Select `1` to add a new keyword group (comma separated).
 - Select `2` to delete a keyword group by its index.
 - Select `3` to list all current keyword groups.
-- Select `4` to exit the keyword manager and terminate the bot.
+- Select `4` to query price statistics (mean, median, min, max) and generate graphic reports.
+- Select `5` to exit the keyword manager and terminate the bot.
 
 All changes are saved to `src/config.py` automatically.
+
+## Price Statistics & Reports
+
+You can query statistics and charts on demand in two ways:
+
+### 1. In the Console Menu
+Select option `4` in the terminal menu while the bot is running. Pick any monitored keyword or enter a custom search term, choose the time scope (`week`, `month`, or `ever`), and view formatted metrics with a generated `matplotlib` chart saved to `reports/`. You will also be prompted if you want the report and graphic sent directly to your Telegram chat.
+
+### 2. In Telegram Chat
+Send commands directly in your notification chat or to your bot:
+- `/stats <keyword>` (defaults to last month)
+- `/stats <keyword> week` (last 7 days)
+- `/stats <keyword> month` (last 30 days)
+- `/stats <keyword> ever` (all time history)
+
+The bot will query Telegram message history on the fly, compute statistics (mean, median, min, max, 25-75% range), generate a visual timeline and distribution chart, and reply with the report photo.
 
 ## Notes
 

@@ -16,5 +16,6 @@ venv/
 # System files
 .DS_Store
 Thumbs.db
-# VSCode settings
-.vscode/
+# Reports and charts
+reports/
+.pytest_cache/
