@@ -1,4 +1,5 @@
 import re
+import logging
 from typing import List, Tuple
 from ..config import IGNORED_CHATS, EXCEPTION_SUBSTRINGS
 from ..utils import send_telegram_message
@@ -6,6 +7,8 @@ from ..services.price_parser import extract_prices_with_values
 from ..services.text_matcher import matches_keyword_group, contains_any_exception
 from ..services.dedup_service import default_deduplicator
 from ..services.keyword_service import load_keywords
+
+logger = logging.getLogger("message_handler")
 
 
 def extract_links(message: str) -> List[str]:
@@ -62,7 +65,7 @@ async def handle_message(event, chat_names):
                 raw_text=raw_message
             )
             if default_deduplicator.is_duplicate(deal_key):
-                print(f"[DEDUP] Suppressing duplicate alert for '{' '.join(keyword_group)}' in {chat_name}")
+                logger.info(f"DEDUP: Suppressed duplicate alert for '{' '.join(keyword_group)}' in {chat_name}")
                 return
 
             msg_link = f"https://t.me/c/{str(chat_id)[4:]}/{event.message.id}" if str(chat_id).startswith("-100") else "Link unavailable"

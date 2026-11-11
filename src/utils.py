@@ -1,7 +1,10 @@
 import re
+import logging
 from typing import Optional, Union
 import requests
 from .config import BOT_TOKEN, CHAT_ID
+
+logger = logging.getLogger("telegram_utils")
 
 
 def escape_md(text: str) -> str:
@@ -28,7 +31,7 @@ def send_telegram_message(
         resp = requests.post(url, data=payload, timeout=10)
         if resp.status_code == 200:
             if keyword_group and chat_name:
-                print(f"[MATCH] keyword={keyword_group} | chat={chat_name}")
+                logger.info(f"MATCH: keyword={keyword_group} | chat={chat_name}")
             return True
         else:
             # If markdown parsing fails, retry without parse_mode
@@ -36,10 +39,10 @@ def send_telegram_message(
                 payload.pop("parse_mode", None)
                 retry_resp = requests.post(url, data=payload, timeout=10)
                 return retry_resp.status_code == 200
-            print(f"[ERROR] Telegram API error: {resp.status_code} - {resp.text}")
+            logger.error(f"Telegram API error: {resp.status_code} - {resp.text}")
             return False
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Telegram send fail: {type(e).__name__}: {e}")
+        logger.error(f"Telegram send fail: {type(e).__name__}: {e}")
         return False
 
 
@@ -74,15 +77,14 @@ def send_telegram_photo(
         if resp.status_code == 200:
             return True
         else:
-            # If markdown failed, retry without markdown
             if parse_mode:
                 data.pop("parse_mode", None)
                 if isinstance(photo, bytes):
                     files["photo"] = ("chart.png", photo, "image/png")
                 retry_resp = requests.post(url, data=data, files=files, timeout=20)
                 return retry_resp.status_code == 200
-            print(f"[ERROR] Telegram sendPhoto error: {resp.status_code} - {resp.text}")
+            logger.error(f"Telegram sendPhoto error: {resp.status_code} - {resp.text}")
             return False
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Telegram sendPhoto fail: {type(e).__name__}: {e}")
+        logger.error(f"Telegram sendPhoto fail: {type(e).__name__}: {e}")
         return False

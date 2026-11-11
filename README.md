@@ -73,6 +73,39 @@ Send commands directly in your notification chat or to your bot:
 
 The bot will query Telegram message history on the fly, compute statistics (mean, median, min, max, 25-75% range), generate a visual timeline and distribution chart, and reply with the report photo.
 
+## Cloud & Free-Tier Hosting (Render, Railway, Fly.io, Docker)
+
+This application is 12-factor ready and optimized for zero-disk free tier cloud containers.
+
+### 1. Generating a StringSession (Zero-Disk Cloud Auth)
+Cloud free tiers erase local `.session` files on restart. Generate a `TELEGRAM_STRING_SESSION` once locally:
+```bash
+python scripts/generate_session_string.py
+```
+Copy the printed `TELEGRAM_STRING_SESSION` and paste it into your cloud host's Environment Variables dashboard.
+
+### 2. Environment Variables (.env)
+You can configure the bot entirely through environment variables:
+- `TELEGRAM_API_ID`: Telegram API ID (integer)
+- `TELEGRAM_API_HASH`: Telegram API Hash
+- `TELEGRAM_PHONE_NUMBER`: Phone number with country code
+- `TELEGRAM_BOT_TOKEN`: BotFather Token
+- `TELEGRAM_CHAT_ID`: Notification recipient chat ID
+- `TELEGRAM_STRING_SESSION`: StringSession from step 1
+- `IGNORED_CHATS`: JSON array or comma-separated list of chat IDs to ignore
+- `EXCEPTION_SUBSTRINGS`: Substrings to ignore
+- `PORT`: Healthcheck port (default: `8080`)
+- `HEALTHCHECK_ENABLED`: Set to `true` for cloud providers requiring HTTP probes (e.g. Render)
+
+### 3. Docker Deployment
+Build and run the container locally or deploy to any Docker registry:
+```bash
+docker build -t telegram-monitor .
+docker run -d --name tg-monitor --env-file .env telegram-monitor
+```
+
+When running in cloud or headless environments (without a TTY), the bot automatically disables the interactive keyboard console to prevent EOF crashes, and remains 100% controllable via Telegram `/stats` commands.
+
 ## Notes
 
 - The bot requires Python 3.10+.
